@@ -1,0 +1,21 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Thư mục dữ liệu (nặng, không cần đưa lên Git)
+Dataset/
+CASIA_faceAntisp/
+
+# Thư mục chứa trọng số mô hình (weights)
+weights/
+
+# Môi trường ảo (nếu có)
+.venv/
+venv/
+env/
+
+# Cấu hình của trình soạn thảo
+.vscode/
+.idea/
