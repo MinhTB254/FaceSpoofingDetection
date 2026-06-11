@@ -8,8 +8,10 @@ __pycache__/
 Dataset/
 CASIA_faceAntisp/
 
-# Thư mục chứa trọng số mô hình (weights)
-weights/
+# Ảnh chẩn đoán tạm thời sinh ra trên máy
+explain_*.png
+real_test*.jpg
+fake_test*.jpg
 
 # Môi trường ảo (nếu có)
 .venv/

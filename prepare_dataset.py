@@ -87,10 +87,17 @@ def process_casia_video(video_path, output_dir, is_real=True, frame_interval=10)
     cap = cv2.VideoCapture(video_path)
     frame_count = 0
     saved_count = 0
+    
+    # Lấy thông tin subset và subject ID để đặt tên file tránh ghi đè
+    normalized_path = os.path.normpath(video_path)
+    path_parts = normalized_path.split(os.sep)
+    subset = path_parts[-3] if len(path_parts) >= 3 else "subset"
+    subj = path_parts[-2] if len(path_parts) >= 2 else "subject"
     video_name = os.path.splitext(os.path.basename(video_path))[0]
     
-    # Khởi tạo bộ phát hiện khuôn mặt nhanh để crop mặt trước khi sinh Depth
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    # Khởi tạo bộ phát hiện khuôn mặt MediaPipe Face Detection
+    mp_face_detection = mp.solutions.face_detection
+    face_detector = mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
     
     while cap.isOpened():
         success, frame = cap.read()
@@ -99,42 +106,64 @@ def process_casia_video(video_path, output_dir, is_real=True, frame_interval=10)
             
         # Chỉ lấy ảnh ở các khoảng interval để tránh trùng lặp dữ liệu quá nhiều
         if frame_count % frame_interval == 0:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+            # Chuyển ảnh sang RGB vì MediaPipe yêu cầu RGB
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = face_detector.process(rgb_frame)
             
-            for (x, y, w, h) in faces:
-                # Thêm biên offset xung quanh mặt giống như trong dataCollection
-                offset_w = int(w * 0.1)
-                offset_h = int(h * 0.1)
-                
-                x1 = max(0, x - offset_w)
-                y1 = max(0, y - offset_h)
-                x2 = min(frame.shape[1], x + w + offset_w)
-                y2 = min(frame.shape[0], y + h + offset_h)
-                
-                face_img = frame[y1:y2, x1:x2]
-                if face_img.size == 0:
-                    continue
+            if results.detections:
+                for detection in results.detections:
+                    bboxC = detection.location_data.relative_bounding_box
+                    ih, iw, ic = frame.shape
                     
-                # Resize khuôn mặt về kích thước chuẩn 256x256
-                face_img_resized = cv2.resize(face_img, (FACE_SIZE, FACE_SIZE))
-                
-                # Sinh Depth Map (32x32)
-                depth_map = generate_depth_map(face_img_resized, is_real=is_real)
-                
-                # Lưu ảnh khuôn mặt và bản đồ độ sâu tương ứng
-                file_id = f"{video_name}_f{frame_count}_{saved_count}"
-                img_path = os.path.join(output_dir, "images", f"{file_id}.jpg")
-                depth_path = os.path.join(output_dir, "depths", f"{file_id}.npy")
-                
-                cv2.imwrite(img_path, face_img_resized)
-                np.save(depth_path, depth_map)
-                saved_count += 1
-                break # Chỉ lấy khuôn mặt đầu tiên phát hiện được
-                
+                    # Chuyển đổi sang tọa độ pixel thực tế
+                    x = int(bboxC.xmin * iw)
+                    y = int(bboxC.ymin * ih)
+                    w = int(bboxC.width * iw)
+                    h = int(bboxC.height * ih)
+                    
+                    # Giới hạn để tránh cắt tràn viền ngoài ảnh
+                    x = max(0, x)
+                    y = max(0, y)
+                    w = min(w, iw - x)
+                    h = min(h, ih - y)
+                    
+                    # Thêm biên offset xung quanh mặt giống như trong dataCollection
+                    offset_w = int(w * 0.1)
+                    offset_h = int(h * 0.1)
+                    
+                    x1 = max(0, x - offset_w)
+                    y1 = max(0, y - offset_h)
+                    x2 = min(iw, x + w + offset_w)
+                    y2 = min(ih, y + h + offset_h)
+                    
+                    face_img = frame[y1:y2, x1:x2]
+                    if face_img.size == 0:
+                        continue
+                        
+                    # Resize khuôn mặt về kích thước chuẩn 256x256
+                    face_img_resized = cv2.resize(face_img, (FACE_SIZE, FACE_SIZE))
+                    
+                    # Sinh Depth Map (32x32)
+                    depth_map = generate_depth_map(face_img_resized, is_real=is_real)
+                    
+                    # NẾU LÀ NGƯỜI THẬT MÀ FACE MESH THẤT BẠI (toàn số 0) -> BỎ QUA KHUNG HÌNH NÀY
+                    if is_real and depth_map.max() == 0:
+                        continue
+                        
+                    # Lưu ảnh khuôn mặt và bản đồ độ sâu tương ứng
+                    file_id = f"{subset}_{subj}_{video_name}_f{frame_count}_{saved_count}"
+                    img_path = os.path.join(output_dir, "images", f"{file_id}.jpg")
+                    depth_path = os.path.join(output_dir, "depths", f"{file_id}.npy")
+                    
+                    cv2.imwrite(img_path, face_img_resized)
+                    np.save(depth_path, depth_map)
+                    saved_count += 1
+                    break # Chỉ lấy khuôn mặt đầu tiên phát hiện được
+                    
         frame_count += 1
         
     cap.release()
+    face_detector.close()
     print(f"Finished processing {video_path}: Extracted {saved_count} quality frames.")
 
 # --- FOR TESTING ---
