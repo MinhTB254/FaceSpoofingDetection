@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 import mediapipe as mp
+from scipy.interpolate import griddata
 
 # Cấu hình các thông số kích thước
 FACE_SIZE = 256        # Ảnh khuôn mặt cắt ra để đưa vào mạng CNN
@@ -39,40 +40,40 @@ def generate_depth_map(image, is_real=True):
         # 1. Trích xuất tọa độ X, Y, Z của các landmarks
         coords = []
         for lm in face_landmarks.landmark:
-            # lm.z là tọa độ chiều sâu ước lượng bởi MediaPipe (nhỏ hơn là gần camera hơn)
             coords.append([lm.x * w, lm.y * h, lm.z])
             
         coords = np.array(coords)
         
-        # 2. Chuẩn hóa chiều sâu Z về khoảng [0, 1]
-        # Trong MediaPipe, Z âm có nghĩa là gần camera hơn (mũi nhô ra).
-        # Ta đảo ngược Z sao cho phần gần camera nhất (mũi) có giá trị cao nhất (1.0), phần xa nhất có giá trị (0.0)
-        z_values = coords[:, 2]
+        # 2. Đảo ngược Z (Z âm là gần camera, đổi thành dương để mũi lớn nhất) và chuẩn hóa về [0, 1]
+        z_values = -coords[:, 2]
         z_min = np.min(z_values)
         z_max = np.max(z_values)
         
         if z_max != z_min:
-            # Đảo ngược và chuẩn hóa về [0, 1]
-            normalized_z = 1.0 - (z_values - z_min) / (z_max - z_min)
+            normalized_z = (z_values - z_min) / (z_max - z_min)
         else:
             normalized_z = np.zeros_like(z_values)
             
-        # 3. Phóng chiếu các landmarks lên lưới 2D kích thước 32x32 để tạo Depth Map
-        # Định vị tọa độ X, Y chuẩn hóa trên lưới 32x32
-        x_grid = np.clip(np.floor(coords[:, 0] / w * (DEPTH_SIZE - 1)).astype(int), 0, DEPTH_SIZE - 1)
-        y_grid = np.clip(np.floor(coords[:, 1] / h * (DEPTH_SIZE - 1)).astype(int), 0, DEPTH_SIZE - 1)
+        # 3. Sử dụng scipy.interpolate.griddata để nội suy bản đồ độ sâu dày đặc 32x32
+        grid_y, grid_x = np.mgrid[0:DEPTH_SIZE, 0:DEPTH_SIZE]
         
-        # Điền các giá trị độ sâu vào bản đồ 2D
-        for idx in range(len(normalized_z)):
-            depth_map[y_grid[idx], x_grid[idx]] = normalized_z[idx]
-            
-        # Áp dụng bộ lọc Gaussian Blur nhẹ để làm mịn các khoảng trống giữa các điểm landmarks
+        points = np.column_stack((
+            coords[:, 1] / h * (DEPTH_SIZE - 1),
+            coords[:, 0] / w * (DEPTH_SIZE - 1)
+        ))
+        
+        # Nội suy bề mặt liên tục
+        depth_map = griddata(points, normalized_z, (grid_y, grid_x), method='linear', fill_value=0.0)
+        
+        # Lọc Gaussian Blur nhẹ để làm mượt các vết răng cưa biên
         depth_map = cv2.GaussianBlur(depth_map, (3, 3), 0)
         
         # Chuẩn hóa lại lần cuối về [0, 1] sau khi lọc blur
         dp_min, dp_max = depth_map.min(), depth_map.max()
         if dp_max != dp_min:
             depth_map = (depth_map - dp_min) / (dp_max - dp_min)
+        else:
+            depth_map = np.clip(depth_map, 0.0, 1.0)
             
     return depth_map
 
@@ -151,7 +152,8 @@ def process_casia_video(video_path, output_dir, is_real=True, frame_interval=10)
                         continue
                         
                     # Lưu ảnh khuôn mặt và bản đồ độ sâu tương ứng
-                    file_id = f"{subset}_{subj}_{video_name}_f{frame_count}_{saved_count}"
+                    prefix = "real" if is_real else "fake"
+                    file_id = f"{prefix}_{subset}_{subj}_{video_name}_f{frame_count}_{saved_count}"
                     img_path = os.path.join(output_dir, "images", f"{file_id}.jpg")
                     depth_path = os.path.join(output_dir, "depths", f"{file_id}.npy")
                     

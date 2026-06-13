@@ -279,19 +279,18 @@ def main():
         for path in image_paths:
             filename = os.path.basename(path)
             parts = filename.split("_")
-            if len(parts) < 3 or parts[0] != "test":
+            if len(parts) < 4 or parts[1] != "test":
                 continue
             try:
-                subj_id = int(parts[2])
+                subj_id = int(parts[3])
             except ValueError:
                 continue
                 
             # Chỉ chọn từ tập Test độc lập (Subject 16 đến 30)
             if 16 <= subj_id <= 30:
-                # Ảnh thật chứa cụm _1_f, _2_f, hoặc _HR_1_f đại diện cho các video real
-                if "_1_f" in filename or "_2_f" in filename or "_HR_1_f" in filename:
+                if parts[0] == "real":
                     real_paths.append(path)
-                else:
+                elif parts[0] == "fake":
                     spoof_paths.append(path)
                 
         # Xử lý và lưu ảnh thật (Real)

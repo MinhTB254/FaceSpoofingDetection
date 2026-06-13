@@ -49,12 +49,13 @@ class FASDepthDataset(Dataset):
         for path in all_image_paths:
             filename = os.path.basename(path)
             parts = filename.split("_")
-            if len(parts) < 3:
+            if len(parts) < 4:
                 continue
                 
-            subset_type = parts[0] # 'train' hoặc 'test'
+            label_str = parts[0]    # 'real' hoặc 'fake'
+            subset_type = parts[1]  # 'train' hoặc 'test'
             try:
-                subj_id = int(parts[2])
+                subj_id = int(parts[3]) # parts[0]='real', parts[1]='train', parts[2]='release', parts[3]=subj_id
             except ValueError:
                 continue
                 
@@ -96,7 +97,11 @@ class FASDepthDataset(Dataset):
                 image = TF.hflip(image)
                 depth_tensor = TF.hflip(depth_tensor)
             
-        return image, depth_tensor
+        # Trích xuất nhãn nhị phân từ tên file: 1.0 cho real, 0.0 cho fake
+        parts = file_id.split("_")
+        label = 1.0 if parts[0] == "real" else 0.0
+        
+        return image, depth_tensor, label
 
 # =====================================================================
 def gradient_loss(pred, target):
@@ -248,8 +253,8 @@ def main():
         model.train()
         train_loss = 0.0
         
-        for images, depths in train_loader:
-            images, depths = images.to(DEVICE), depths.to(DEVICE)
+        for images, depths, labels in train_loader:
+            images, depths, labels = images.to(DEVICE), depths.to(DEVICE), labels.to(DEVICE)
             
             optimizer.zero_grad()
             
@@ -271,9 +276,11 @@ def main():
         # Giai đoạn Đánh giá (Validation)
         model.eval()
         val_loss = 0.0
+        val_correct = 0
+        val_total = 0
         with torch.no_grad():
-            for images, depths in val_loader:
-                images, depths = images.to(DEVICE), depths.to(DEVICE)
+            for images, depths, labels in val_loader:
+                images, depths, labels = images.to(DEVICE), depths.to(DEVICE), labels.to(DEVICE)
                 with torch.cuda.amp.autocast(enabled=use_pin):
                     outputs = model(images)
                     loss_mse = criterion(outputs, depths)
@@ -281,9 +288,20 @@ def main():
                     loss = loss_mse + 0.5 * loss_grad
                 val_loss += loss.item() * images.size(0)
                 
+                # Tính toán điểm số liveness và accuracy
+                batch_means = outputs.mean(dim=[1, 2, 3])
+                batch_stds = outputs.std(dim=[1, 2, 3])
+                scores = (batch_means * batch_stds) * 400.0
+                
+                # Phân loại dựa trên THRESHOLD_SCORE = 8.0
+                preds = (scores > 8.0).float()
+                val_correct += (preds == labels).sum().item()
+                val_total += images.size(0)
+                
         val_loss /= len(val_dataset)
+        val_acc = (val_correct / val_total) * 100.0
         
-        print(f"Epoch [{epoch+1}/{EPOCHS}] | Train Loss: {train_loss:.6f} | Val Loss: {val_loss:.6f}")
+        print(f"Epoch [{epoch+1}/{EPOCHS}] | Train Loss: {train_loss:.6f} | Val Loss: {val_loss:.6f} | Val Acc: {val_acc:.2f}%")
         
         # Lưu trữ mô hình có Val Loss thấp nhất
         if val_loss < best_val_loss:
