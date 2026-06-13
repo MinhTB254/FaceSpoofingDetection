@@ -141,8 +141,8 @@ def process_and_save(model, image_path, output_filename):
     mp_face_detection = mp.solutions.face_detection
     face_cropped_rgb = None
     
-    # model_selection=1 cho khoảng cách xa hơn (full/half-body) phù hợp với ảnh selfie chụp từ điện thoại
-    with mp_face_detection.FaceDetection(model_selection=1, min_detection_confidence=0.5) as face_detector:
+    # model_selection=0 cho khoảng cách gần (webcam) để đồng nhất với test_realtime.py
+    with mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5) as face_detector:
         results = face_detector.process(orig_image_rgb)
         
         if results.detections:

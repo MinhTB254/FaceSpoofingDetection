@@ -3,6 +3,7 @@ import sys
 import glob
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
 from PIL import Image
@@ -96,6 +97,18 @@ class FASDepthDataset(Dataset):
                 depth_tensor = TF.hflip(depth_tensor)
             
         return image, depth_tensor
+
+# =====================================================================
+def gradient_loss(pred, target):
+    """
+    Spatial Gradient Loss (L1 loss on first-order depth derivatives).
+    Forces the model to learn spatial transitions (3D shape curves) and penalizes noise.
+    """
+    pred_dx   = pred[:, :, :, 1:] - pred[:, :, :, :-1]
+    pred_dy   = pred[:, :, 1:, :] - pred[:, :, :-1, :]
+    target_dx = target[:, :, :, 1:] - target[:, :, :, :-1]
+    target_dy = target[:, :, 1:, :] - target[:, :, :-1, :]
+    return F.l1_loss(pred_dx, target_dx) + F.l1_loss(pred_dy, target_dy)
 
 # =====================================================================
 # 2. Định nghĩa Mô hình ước lượng Depth Map (MobileNetV2 làm Backbone + U-Net Feature Fusion)
@@ -243,7 +256,9 @@ def main():
             # Sử dụng Autocast để tự động tính toán với độ chính xác hỗn hợp (float16 & float32)
             with torch.cuda.amp.autocast(enabled=use_pin):
                 outputs = model(images)
-                loss = criterion(outputs, depths)
+                loss_mse = criterion(outputs, depths)
+                loss_grad = gradient_loss(outputs, depths)
+                loss = loss_mse + 0.5 * loss_grad
                 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -261,7 +276,9 @@ def main():
                 images, depths = images.to(DEVICE), depths.to(DEVICE)
                 with torch.cuda.amp.autocast(enabled=use_pin):
                     outputs = model(images)
-                    loss = criterion(outputs, depths)
+                    loss_mse = criterion(outputs, depths)
+                    loss_grad = gradient_loss(outputs, depths)
+                    loss = loss_mse + 0.5 * loss_grad
                 val_loss += loss.item() * images.size(0)
                 
         val_loss /= len(val_dataset)

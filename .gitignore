@@ -12,6 +12,7 @@ CASIA_faceAntisp/
 explain_*.png
 real_test*.jpg
 fake_test*.jpg
+debug_face.jpg
 
 # Môi trường ảo (nếu có)
 .venv/

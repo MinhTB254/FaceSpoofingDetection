@@ -10,7 +10,7 @@ from train_depth import DepthFASModel, DEVICE
 
 # Cấu hình ngưỡng quyết định và kích thước đầu vào
 FACE_SIZE = 256
-THRESHOLD_SCORE = 11.0  # Ngưỡng tối ưu cho công thức kết hợp Mean & Std kháng khoảng cách
+THRESHOLD_SCORE = 8.0  # Ngưỡng tối ưu dựa trên tích số Mean & Std để chống ảnh thẻ/nhiễu phản xạ
 
 # Khởi tạo Transforms (Phải trùng khớp với lúc Train)
 test_transform = transforms.Compose([
@@ -106,8 +106,8 @@ def main():
                 depth_mean = np.mean(depth_map)
                 depth_std = np.std(depth_map)
                 
-                # Điểm số kết hợp Mean (độ lớn) và Std (độ lồi lõm cấu trúc 3D)
-                raw_score = (depth_mean * 40.0) + (depth_std * 60.0)
+                # Điểm số tích hợp nhân Mean & Std để triệt tiêu các ảnh phẳng có nhiễu đột biến
+                raw_score = (depth_mean * depth_std) * 400.0
                 
                 # Thêm điểm số của khung hình hiện tại vào cửa sổ trượt
                 score_window.append(raw_score)
@@ -145,8 +145,20 @@ def main():
                 
         cv2.imshow("Anti-Spoofing Real-time Depth", img_display)
         
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
             break
+        elif key == ord('s'):
+            if 'liveness_score' in locals():
+                cv2.imwrite("debug_face.jpg", frame)
+                print("\n[DEBUG] Đã lưu ảnh debug toàn khung hình vào: debug_face.jpg")
+                print(f"[DEBUG] Thông số của khung hình vừa lưu:")
+                print(f"  - Mean: {depth_mean:.4f}")
+                print(f"  - Std: {depth_std:.4f}")
+                print(f"  - Raw Score: {raw_score:.2f}")
+                print(f"  - Liveness Score (đã mịn): {liveness_score:.2f}")
+            else:
+                print("\n[DEBUG] Không lưu được ảnh vì chưa phát hiện khuôn mặt nào!")
             
     cap.release()
     face_detector.close()
