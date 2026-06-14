@@ -115,10 +115,20 @@ def run_occlusion_sensitivity(model, input_tensor, patch_size=32, stride=16):
     # Lấy trung bình cộng tại những chỗ bị đè lặp
     sensitivity_map = np.divide(sensitivity_map, counts, out=np.zeros_like(sensitivity_map), where=counts!=0)
     
-    # Chuẩn hóa về dải [0, 1]
-    s_min, s_max = sensitivity_map.min(), sensitivity_map.max()
-    if s_max != s_min:
-        sensitivity_map = (sensitivity_map - s_min) / (s_max - s_min)
+    # Phân biệt Real và Spoof dựa trên baseline score (độ sâu trung bình dự đoán)
+    # Ảnh Real có baseline_score > 0.25, ảnh Spoof < 0.01
+    if baseline_score > 0.05:
+        # Đối với ảnh Real, ta chuẩn hóa bản đồ độ nhạy về dải [0, 1]
+        s_min, s_max = sensitivity_map.min(), sensitivity_map.max()
+        diff_val = s_max - s_min
+        if diff_val > 1e-8:
+            sensitivity_map = (sensitivity_map - s_min) / diff_val
+        else:
+            sensitivity_map = np.zeros_like(sensitivity_map)
+    else:
+        # Đối với ảnh Spoof (độ sâu phẳng gần bằng 0), sự biến đổi chỉ là nhiễu số học
+        # Ta triệt tiêu hoàn toàn để hiển thị màu xanh lam đồng nhất
+        sensitivity_map = np.zeros_like(sensitivity_map)
         
     return sensitivity_map
 
