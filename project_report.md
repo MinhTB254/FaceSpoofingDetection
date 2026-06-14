@@ -302,7 +302,7 @@ Hình ảnh dưới đây hiển thị đường cong ROC (Receiver Operating Ch
 Dưới đây là hình ảnh thực tế chạy Grad-CAM và Occlusion Sensitivity của mô hình trên các mẫu thử nghiệm:
 
 #### A. Trực quan hóa giải thích mô hình trên ảnh Người thật (REAL):
-![XAI Real Face](results/explain_real.png)
+![XAI Real Face](explain_real.png)
 
 #### B. Trực quan hóa giải thích mô hình trên ảnh Giả mạo (SPOOF):
 ![XAI Spoof Face](results/explain_spoof.png)
