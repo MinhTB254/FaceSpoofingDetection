@@ -49,14 +49,23 @@ class FASDepthDataset(Dataset):
         for path in all_image_paths:
             filename = os.path.basename(path)
             parts = filename.split("_")
-            if len(parts) < 4:
-                continue
-                
-            label_str = parts[0]    # 'real' hoặc 'fake'
-            subset_type = parts[1]  # 'train' hoặc 'test'
-            try:
-                subj_id = int(parts[3]) # parts[0]='real', parts[1]='train', parts[2]='release', parts[3]=subj_id
-            except ValueError:
+            if len(parts) >= 8:
+                # Định dạng mới 8 phần: [label]_[attack_type]_[subset]_[release]_[subj]_[video]_[frame]_[idx].jpg
+                label_str = parts[0]
+                subset_type = parts[2]
+                try:
+                    subj_id = int(parts[4])
+                except ValueError:
+                    continue
+            elif len(parts) >= 4:
+                # Định dạng cũ 4 phần: [label]_[subset]_[release]_[subj]_...
+                label_str = parts[0]
+                subset_type = parts[1]
+                try:
+                    subj_id = int(parts[3])
+                except ValueError:
+                    continue
+            else:
                 continue
                 
             if split == "train":

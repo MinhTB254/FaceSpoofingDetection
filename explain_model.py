@@ -279,10 +279,10 @@ def main():
         for path in image_paths:
             filename = os.path.basename(path)
             parts = filename.split("_")
-            if len(parts) < 4 or parts[1] != "test":
+            if len(parts) < 8 or parts[2] != "test":
                 continue
             try:
-                subj_id = int(parts[3])
+                subj_id = int(parts[4])
             except ValueError:
                 continue
                 

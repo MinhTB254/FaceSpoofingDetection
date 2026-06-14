@@ -77,13 +77,14 @@ def generate_depth_map(image, is_real=True):
             
     return depth_map
 
-def process_casia_video(video_path, output_dir, is_real=True, frame_interval=10):
+def process_casia_video(video_path, output_dir, attack_type="bonafide", frame_interval=10):
     """
     Đọc một video từ CASIA-FASD, cắt khuôn mặt và sinh nhãn Depth Map 32x32 cho các frames.
     """
     os.makedirs(os.path.join(output_dir, "images"), exist_ok=True)
-    os.path.join(output_dir, "depths")
     os.makedirs(os.path.join(output_dir, "depths"), exist_ok=True)
+    
+    is_real = (attack_type == "bonafide")
     
     cap = cv2.VideoCapture(video_path)
     frame_count = 0
@@ -93,8 +94,11 @@ def process_casia_video(video_path, output_dir, is_real=True, frame_interval=10)
     normalized_path = os.path.normpath(video_path)
     path_parts = normalized_path.split(os.sep)
     subset = path_parts[-3] if len(path_parts) >= 3 else "subset"
+    subset_clean = "train" if "train" in subset else "test"
     subj = path_parts[-2] if len(path_parts) >= 2 else "subject"
     video_name = os.path.splitext(os.path.basename(video_path))[0]
+    # Loại bỏ dấu gạch dưới trong tên video (ví dụ: HR_1 -> HR1) để đảm bảo cấu trúc tên tệp tin 8 phần không bị lỗi split('_')
+    video_name_clean = video_name.replace("_", "")
     
     # Khởi tạo bộ phát hiện khuôn mặt MediaPipe Face Detection
     mp_face_detection = mp.solutions.face_detection
@@ -153,7 +157,7 @@ def process_casia_video(video_path, output_dir, is_real=True, frame_interval=10)
                         
                     # Lưu ảnh khuôn mặt và bản đồ độ sâu tương ứng
                     prefix = "real" if is_real else "fake"
-                    file_id = f"{prefix}_{subset}_{subj}_{video_name}_f{frame_count}_{saved_count}"
+                    file_id = f"{prefix}_{attack_type}_{subset_clean}_release_{subj}_{video_name_clean}_f{frame_count}_{saved_count}"
                     img_path = os.path.join(output_dir, "images", f"{file_id}.jpg")
                     depth_path = os.path.join(output_dir, "depths", f"{file_id}.npy")
                     

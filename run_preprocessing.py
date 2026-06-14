@@ -48,17 +48,24 @@ def main():
                     
                 video_path = os.path.join(subj_path, video_file)
                 
-                # CORRECTED CLASSIFICATION RULES:
-                # - Only "1.avi", "2.avi", "HR_1.avi" are REAL/LIVE.
-                # - All other files (e.g., 3.avi, 4.avi, HR_2.avi, etc.) are SPOOF/FAKE.
-                is_real = video_file in ["1.avi", "2.avi", "HR_1.avi"]
+                # CLASSIFICATION RULES FOR ATTACK TYPES:
+                if video_file in ["1.avi", "2.avi", "HR_1.avi"]:
+                    attack_type = "bonafide"
+                elif video_file in ["3.avi", "4.avi", "HR_2.avi"]:
+                    attack_type = "print"
+                elif video_file in ["5.avi", "6.avi", "HR_3.avi"]:
+                    attack_type = "cut"
+                elif video_file in ["7.avi", "8.avi", "HR_4.avi"]:
+                    attack_type = "replay"
+                else:
+                    attack_type = "print"
                 
                 # Extract frames and generate labels
                 # frame_interval = 10 (Take 1 frame every 10 frames)
                 process_casia_video(
                     video_path=video_path,
                     output_dir=output_dir,
-                    is_real=is_real,
+                    attack_type=attack_type,
                     frame_interval=10
                 )
                 
