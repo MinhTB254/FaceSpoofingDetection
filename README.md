@@ -78,5 +78,3 @@ python explain_model.py --image debug_face.jpg
 
 ---
 
-## ⚖️ Giấy phép & Đóng góp
-Dự án được xây dựng phục vụ cho mục đích nghiên cứu học tập về Face Anti-Spoofing sử dụng Thị giác máy tính và Học sâu. Mọi đóng góp cải tiến thuật toán xin vui lòng tạo Pull Request hoặc Issue trên GitHub.
