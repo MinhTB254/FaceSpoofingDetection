@@ -74,7 +74,7 @@ python test_realtime.py
 python explain_model.py --image debug_face.jpg
 ```
 * Chương trình sẽ tạo ra ảnh trực quan hóa **`explain_debug_face.png`** chứa bản đồ độ sâu dự đoán, Grad-CAM (vùng kích hoạt chiều sâu) và Occlusion Map (độ nhạy che khuất).
-* Nếu chạy không truyền tham số `--image`, chương trình sẽ tự động chọn ngẫu nhiên 1 ảnh Real và 1 ảnh Spoof trong tập Test độc lập để sinh ảnh so sánh `explain_real.png` và `explain_spoof.png`.
+* Nếu chạy không truyền tham số `--image`, chương trình sẽ tự động chọn ngẫu nhiên 1 ảnh Real + 1 ảnh Spoof trong tập Test độc lập để sinh ảnh so sánh `explain_real.png` và `explain_spoof.png`.
 
 ---
 
